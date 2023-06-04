@@ -16,7 +16,7 @@ class WebSocket {
     // セッションを開始する
     openChannel(){
         console.log("コネクションを開始しします。");
-        this.connection = new WebSocket('ws://3.223.136.68:9002?playerSessionId=test');
+        this.connection = new WebSocket('ws');
 
         //コネクションが接続された時の動き
         this.connection.onopen = function(e) {

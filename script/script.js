@@ -134,7 +134,7 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        wsConnection = new WebSocket('ws://35.170.71.236:9002?playerSessionId=test');
+        /*wsConnection = new WebSocket('ws:');
         console.log("コネクションを開始しします。");
             //コネクションが接続された時の動き
         wsConnection.onopen = function(e) {
@@ -148,7 +148,7 @@
         wsConnection.onmessage = function(e) {
             message = e.data;
             console.log(e.data);
-        }
+        }*/
 
         // 初期化処理を行う
         initialize();
@@ -248,10 +248,6 @@
                 scene.use(activeScene);
                 keyUp = false;
             }
-
-            wsConnection.onopen = function(e) {
-                console.log("コネクションを開始しました。");
-            };
         });
         // ログインシーン
         scene.add('login', (time) => {
