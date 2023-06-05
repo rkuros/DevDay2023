@@ -121,6 +121,13 @@
      * @type {Array<card>}
      */
     let openCardNum = 0;
+    /**
+     * Charenging中のカード保存
+     * @type {Array<card>}
+     */
+    let charengeCardNum = null;
+
+    const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     
 
     /**
@@ -289,15 +296,26 @@
         scene.add('chose', (time) => {
             wsConnection.onmessage = function(e) {
                 message = JSON.parse(e.data);            
-                console.log('charange');
+                console.log(message);
                 console.log(message['card']);
                 cardArray[message.card].setImagePath(message['picture']);
                 cardArray[message.card].setState(true);
-                if(message['status'] === "Success"){
-                    //openCardNum += 2;
+                //await _sleep(2000);
+                if(message['status'] === "challenging"){
+                    charengeCardNum = message['card'];
+                    //console.log(message['card']);
                 }
-                openCardNum += 1;
-            } 
+                if(message['status'] === "Success"){
+                    openCardNum += 2;
+                }
+                if(message['status'] === "Failed"){
+                    cardArray[message.card].setImagePath(picture[CARD_COUNT/2]);
+                    cardArray[message.card].setState(false);
+                    cardArray[charengeCardNum].setImagePath(picture[CARD_COUNT/2]);
+                    cardArray[charengeCardNum].setState(false);
+                }
+                //openCardNum += 1;
+            }
             // 自分が選択者かの確認
             if(message['your_turn'] === true){
                 // カーソルのイベントチェック
@@ -323,14 +341,25 @@
             // メッセージを受信後の挙動
             wsConnection.onmessage = function(e) {
                 message = JSON.parse(e.data);            
-                console.log('charange');
+                console.log(message);
                 console.log(message['card']);
                 cardArray[message.card].setImagePath(message['picture']);
                 cardArray[message.card].setState(true);
-                if(message['status'] === "Success"){
-                    //openCardNum += 2;
+                //await _sleep(2000);
+                if(message['status'] === "challenging"){
+                    charengeCardNum = message['card'];
+                    //console.log(message['card']);
                 }
-                openCardNum += 1;
+                if(message['status'] === "Success"){
+                    openCardNum += 2;
+                }
+                if(message['status'] === "Failed"){
+                    cardArray[message.card].setImagePath(picture[CARD_COUNT/2]);
+                    cardArray[message.card].setState(false);
+                    cardArray[charengeCardNum].setImagePath(picture[CARD_COUNT/2]);
+                    cardArray[charengeCardNum].setState(false);
+                }
+                //openCardNum += 1;
             }
             if(message['your_turn'] === false){
                 ctx.font = 'bold 150px sans-serif';
