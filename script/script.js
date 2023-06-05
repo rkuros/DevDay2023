@@ -134,7 +134,7 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        /*wsConnection = new WebSocket('ws:');
+        wsConnection = new WebSocket('ws://');
         console.log("コネクションを開始しします。");
             //コネクションが接続された時の動き
         wsConnection.onopen = function(e) {
@@ -146,9 +146,10 @@
         };
         // メッセージを受信したらmessageに保存
         wsConnection.onmessage = function(e) {
-            message = e.data;
-            console.log(e.data);
-        }*/
+            message = JSON.parse(e.data);            
+            console.log(message);
+            console.log(message['card']);
+        }
 
         // 初期化処理を行う
         initialize();
@@ -238,10 +239,18 @@
     function sceneSetting(){
         // イントロシーン
         scene.add('intro', (time) => {
+            // メッセージを受信後の挙動
+            wsConnection.onmessage = function(e) {
+                message = JSON.parse(e.data);            
+                console.log(message);
+                console.log(message['card']);
+            }
+            
             ctx.font = 'bold 150px sans-serif';
             util.drawText('GameStart', 150, 150, 'black', CANVAS_WIDTH/2);
             ctx.font = 'bold 50px sans-serif';
             util.drawText('pressEnter', 300, 300, 'red', CANVAS_WIDTH/2);
+
             // Enterでシーンを card に変更する
             if(window.isKeyDown.key_Enter === true && keyUp === true){
                 activeScene = 'login';
@@ -272,26 +281,73 @@
             util.drawText('Matching Page', 150, 150, 'black', CANVAS_WIDTH/2);
             // 2 秒経過したらシーンを card に変更する
             if(time > 2.0){
-                activeScene = 'card';
+                activeScene = 'chose';
                 scene.use(activeScene);
             }
         });
-        // カード選択ページでの
-        scene.add('card', (time) => {
-            // シーンのフレーム数が 0 のとき以外は即座に終了する
-            //if(scene.frame !== 0){return;}
+        // カード選択ページ
+        scene.add('chose', (time) => {
+            wsConnection.onmessage = function(e) {
+                message = JSON.parse(e.data);            
+                console.log('charange');
+                console.log(message['card']);
+                cardArray[message.card].setImagePath(message['picture']);
+                cardArray[message.card].setState(true);
+                if(message['status'] === "Success"){
+                    //openCardNum += 2;
+                }
+                openCardNum += 1;
+            } 
+            // 自分が選択者かの確認
+            if(message['your_turn'] === true){
+                // カーソルのイベントチェック
+                cursorUpdate();
 
-            // カーソルのイベントチェック
-            cursorUpdate();
+                // カードを更新する
+                cardArray.map((v) => {
+                    v.update();
+                });
 
-            // カードを更新する
-            cardArray.map((v) => {
-                v.update();
-            });
+                // ゲーム終了判定
+                if(openCardNum === CARD_COUNT){
+                    activeScene = 'end';
+                    scene.use(activeScene);
+                }
+            }else{
+                activeScene = 'wait';
+                scene.use(activeScene);
+            }
+        });
+        // カード選択結果取得待ち
+        scene.add('wait', (time) => {
+            // メッセージを受信後の挙動
+            wsConnection.onmessage = function(e) {
+                message = JSON.parse(e.data);            
+                console.log('charange');
+                console.log(message['card']);
+                cardArray[message.card].setImagePath(message['picture']);
+                cardArray[message.card].setState(true);
+                if(message['status'] === "Success"){
+                    //openCardNum += 2;
+                }
+                openCardNum += 1;
+            }
+            if(message['your_turn'] === false){
+                ctx.font = 'bold 150px sans-serif';
+                util.drawText('Chosing wait', 150, 150, 'black', CANVAS_WIDTH/2);
+    
+                // カードを更新する
+                cardArray.map((v) => {
+                    v.update();
+                });
 
-            // ゲーム終了判定
-            if(openCardNum === CARD_COUNT){
-                activeScene = 'end';
+                // ゲーム終了判定
+                if(openCardNum === CARD_COUNT){
+                    activeScene = 'end';
+                    scene.use(activeScene);
+                }
+            }else{
+                activeScene = 'chose';
                 scene.use(activeScene);
             }
         });
@@ -323,10 +379,10 @@
      * 画像のパスのリストを取得する//場合によってはイメージのインスタンスを別途作る必要あるかも
      */
     function imageGet(){
-        picture[0] = './image/image_1.jpeg';
-        picture[1] = './image/image_3.jpeg';
-        picture[2] = './image/image_18.jpeg';
-        picture[3] = './image/image_22.jpeg';
+        picture[0] = "./image/image_1.jpeg";
+        picture[1] = "./image/image_3.jpeg";
+        picture[2] = "./image/image_18.jpeg";
+        picture[3] = "./image/image_22.jpeg";
         picture[4] = './image/image_25.jpeg';
         picture[5] = './image/image_33.jpeg';
         picture[6] = './image/image_35.jpeg';
@@ -370,9 +426,17 @@
         if(window.isKeyDown.key_Enter === true){
             // カードの状態が裏ならエンター処理
             if(cardArray[cursorNum].getState() === false){
-                cardArray[cursorNum].setImagePath(picture[Math.floor( Math.random() * (7 + 1 - 0) ) + 0]);
-                cardArray[cursorNum].setState(true);
-                openCardNum += 1;
+                //cardArray[cursorNum].setImagePath(picture[Math.floor( Math.random() * (7 + 1 - 0) ) + 0]);
+                //cardArray[cursorNum].setState(true);
+                // 選択したカードをサーバーに送信
+                let a = {"card": cursorNum};
+                console.log("Submit"+JSON.stringify(a));
+                wsConnection.send(JSON.stringify(a));
+                // 現在のカードがオープンされた数
+                //openCardNum += 1;
+                // シーンをCharangeに変更
+                activeScene = 'charange';
+                scene.use(activeScene);
             }
         }
     }
