@@ -30,6 +30,12 @@ class Position {
         if(x != null){this.x = x;}
         if(y != null){this.y = y;}
     }
+    getX(){
+        return(this.x);
+    }
+    getY(){
+        return(this.y);
+    }
 }
 
 /**
@@ -173,309 +179,8 @@ class Character {
 }
 
 /**
- * viper クラス
+ * カードのクラス
  */
-class Viper extends Character {
-    /**
-     * @constructor
-     * @param {CanvasRenderingContext2D} ctx - 描画などに利用する 2D コンテキスト
-     * @param {number} x - X 座標
-     * @param {number} y - Y 座標
-     * @param {number} w - 幅
-     * @param {number} h - 高さ
-     * @param {Image} image - キャラクター用の画像のパス
-     */
-    constructor(ctx, x, y, w, h, imagePath){
-        // 継承元の初期化
-        super(ctx, x, y, w, h, 0, imagePath);
-
-        /**
-         * 自身の移動スピード（update 一回あたりの移動量）
-         * @type {number}
-         */
-        this.speed = 3;
-        /**
-         * ショットを撃ったあとのチェック用カウンタ
-         * @type {number}
-         */
-        this.shotCheckCounter = 0;
-        /**
-         * ショットを撃つことができる間隔（フレーム数）
-         * @type {number}
-         */
-        this.shotInterval = 10;
-        /**
-         * viper が登場中かどうかを表すフラグ
-         * @type {boolean}
-         */
-        this.isComing = false;
-        /**
-         * 登場演出を開始した際のタイムスタンプ
-         * @type {number}
-         */
-        this.comingStart = null;
-        /**
-         * 登場演出を開始する座標
-         * @type {Position}
-         */
-        this.comingStartPosition = null;
-        /**
-         * 登場演出を完了とする座標
-         * @type {Position}
-         */
-        this.comingEndPosition = null;
-        /**
-         * 自身が持つショットインスタンスの配列
-         * @type {Array<Shot>}
-         */
-        this.shotArray = null;
-        /**
-         * 自身が持つシングルショットインスタンスの配列
-         * @type {Array<Shot>}
-         */
-        this.singleShotArray = null;
-    }
-
-    /**
-     * 登場演出に関する設定を行う
-     * @param {number} startX - 登場開始時の X 座標
-     * @param {number} startY - 登場開始時の Y 座標
-     * @param {number} endX - 登場終了とする X 座標
-     * @param {number} endY - 登場終了とする Y 座標
-     */
-    setComing(startX, startY, endX, endY){
-        // 登場中のフラグを立てる
-        this.isComing = true;
-        // 登場開始時のタイムスタンプを取得する
-        this.comingStart = Date.now();
-        // 登場開始位置に自機を移動させる
-        this.position.set(startX, startY);
-        // 登場開始位置を設定する
-        this.comingStartPosition = new Position(startX, startY);
-        // 登場終了とする座標を設定する
-        this.comingEndPosition = new Position(endX, endY);
-    }
-
-    /**
-     * ショットを設定する
-     * @param {Array<Shot>} shotArray - 自身に設定するショットの配列
-     * @param {Array<Shot>} singleShotArray - 自身に設定するシングルショットの配列
-     */
-    setShotArray(shotArray, singleShotArray){
-        // 自身のプロパティに設定する
-        this.shotArray = shotArray;
-        this.singleShotArray = singleShotArray;
-    }
-
-    /**
-     * キャラクターの状態を更新し描画を行う
-     */
-    update(){
-        // 現時点のタイムスタンプを取得する
-        let justTime = Date.now();
-
-        // 登場シーンかどうかに応じて処理を振り分ける
-        if(this.isComing === true){
-            // 登場シーンが始まってからの経過時間
-            let comingTime = (justTime - this.comingStart) / 1000;
-            // 登場中は時間が経つほど上に向かって進む
-            let y = this.comingStartPosition.y - comingTime * 50;
-            // 一定の位置まで移動したら登場シーンを終了する
-            if(y <= this.comingEndPosition.y){
-                this.isComing = false;        // 登場シーンフラグを下ろす
-                y = this.comingEndPosition.y; // 行き過ぎの可能性もあるので位置を再設定
-            }
-            // 求めた Y 座標を自機に設定する
-            this.position.set(this.position.x, y);
-
-            // 自機の登場演出時は点滅させる
-            if(justTime % 100 < 50){
-                this.ctx.globalAlpha = 0.5;
-            }
-        }else{
-            // キーの押下状態を調べて挙動を変える
-            if(window.isKeyDown.key_ArrowLeft === true){
-                this.position.x -= this.speed; // アローキーの左
-            }
-            if(window.isKeyDown.key_ArrowRight === true){
-                this.position.x += this.speed; // アローキーの右
-            }
-            if(window.isKeyDown.key_ArrowUp === true){
-                this.position.y -= this.speed; // アローキーの上
-            }
-            if(window.isKeyDown.key_ArrowDown === true){
-                this.position.y += this.speed; // アローキーの下
-            }
-            // 移動後の位置が画面外へ出ていないか確認して修正する
-            let canvasWidth = this.ctx.canvas.width;
-            let canvasHeight = this.ctx.canvas.height;
-            let tx = Math.min(Math.max(this.position.x, 0), canvasWidth);
-            let ty = Math.min(Math.max(this.position.y, 0), canvasHeight);
-            this.position.set(tx, ty);
-
-            // キーの押下状態を調べてショットを生成する
-            if(window.isKeyDown.key_z === true){
-                // ショットを撃てる状態なのかを確認する
-                // ショットチェック用カウンタが 0 以上ならショットを生成できる
-                if(this.shotCheckCounter >= 0){
-                    let i;
-                    // ショットの生存を確認し非生存のものがあれば生成する
-                    for(i = 0; i < this.shotArray.length; ++i){
-                        // 非生存かどうかを確認する
-                        if(this.shotArray[i].life <= 0){
-                            // 自機キャラクターの座標にショットを生成する
-                            this.shotArray[i].set(this.position.x, this.position.y);
-                            // ショットを生成したのでインターバルを設定する
-                            this.shotCheckCounter = -this.shotInterval;
-                            // ひとつ生成したらループを抜ける
-                            break;
-                        }
-                    }
-                    // シングルショットの生存を確認し非生存のものがあれば生成する
-                    // このとき、2 個をワンセットで生成し左右に進行方向を振り分ける
-                    for(i = 0; i < this.singleShotArray.length; i += 2){
-                        // 非生存かどうかを確認する
-                        if(this.singleShotArray[i].life <= 0 && this.singleShotArray[i + 1].life <= 0){
-                            // 真上の方向（270 度）から左右に 10 度傾いたラジアン
-                            let radCW = 280 * Math.PI / 180;  // 時計回りに 10 度分
-                            let radCCW = 260 * Math.PI / 180; // 反時計回りに 10 度分
-                            // 自機キャラクターの座標にショットを生成する
-                            this.singleShotArray[i].set(this.position.x, this.position.y);
-                            this.singleShotArray[i].setVectorFromAngle(radCW); // やや右に向かう
-                            this.singleShotArray[i + 1].set(this.position.x, this.position.y);
-                            this.singleShotArray[i + 1].setVectorFromAngle(radCCW); // やや左に向かう
-                            // ショットを生成したのでインターバルを設定する
-                            this.shotCheckCounter = -this.shotInterval;
-                            // 一組生成したらループを抜ける
-                            break;
-                        }
-                    }
-                }
-            }
-            // ショットチェック用のカウンタをインクリメントする
-
-            ++this.shotCheckCounter;
-        }
-
-        // 自機キャラクターを描画する
-        this.draw();
-
-        // 念の為グローバルなアルファの状態を元に戻す
-        this.ctx.globalAlpha = 1.0;
-    }
-}
-
-/**
- * 敵キャラクタークラス
- */
-class Enemy extends Character {
-    /**
-     * @constructor
-     * @param {CanvasRenderingContext2D} ctx - 描画などに利用する 2D コンテキスト
-     * @param {number} x - X 座標
-     * @param {number} y - Y 座標
-     * @param {number} w - 幅
-     * @param {number} h - 高さ
-     * @param {Image} image - キャラクター用の画像のパス
-     */
-    constructor(ctx, x, y, w, h, imagePath){
-        // 継承元の初期化
-        super(ctx, x, y, w, h, 0, imagePath);
-
-        /**
-         * 自身の移動スピード（update 一回あたりの移動量）
-         * @type {number}
-         */
-        this.speed = 3;
-    }
-
-    /**
-     * 敵を配置する
-     * @param {number} x - 配置する X 座標
-     * @param {number} y - 配置する Y 座標
-     * @param {number} [life=1] - 設定するライフ
-     */
-    set(x, y, life = 1){
-        // 登場開始位置に敵キャラクターを移動させる
-        this.position.set(x, y);
-        // 敵キャラクターのライフを 0 より大きい値（生存の状態）に設定する
-        this.life = life;
-    }
-
-    /**
-     * キャラクターの状態を更新し描画を行う
-     */
-    update(){
-        // もし敵キャラクターのライフが 0 以下の場合はなにもしない
-        if(this.life <= 0){return;}
-        // もし敵キャラクターが画面外（画面下端）へ移動していたらライフを 0（非生存の状態）に設定する
-        if(this.position.y - this.height > this.ctx.canvas.height){
-            this.life = 0;
-        }
-        // 敵キャラクターを進行方向に沿って移動させる
-        this.position.x += this.vector.x * this.speed;
-        this.position.y += this.vector.y * this.speed;
-
-        // 描画を行う（いまのところ特に回転は必要としていないのでそのまま描画）
-        this.draw();
-    }
-}
-
-/**
- * shot クラス
- */
-class Shot extends Character {
-    /**
-     * @constructor
-     * @param {CanvasRenderingContext2D} ctx - 描画などに利用する 2D コンテキスト
-     * @param {number} x - X 座標
-     * @param {number} y - Y 座標
-     * @param {number} w - 幅
-     * @param {number} h - 高さ
-     * @param {Image} image - キャラクター用の画像のパス
-     */
-    constructor(ctx, x, y, w, h, imagePath){
-        // 継承元の初期化
-        super(ctx, x, y, w, h, 0, imagePath);
-
-        /**
-         * 自身の移動スピード（update 一回あたりの移動量）
-         * @type {number}
-         */
-        this.speed = 7;
-    }
-
-    /**
-     * ショットを配置する
-     * @param {number} x - 配置する X 座標
-     * @param {number} y - 配置する Y 座標
-     */
-    set(x, y){
-        // 登場開始位置にショットを移動させる
-        this.position.set(x, y);
-        // ショットのライフを 0 より大きい値（生存の状態）に設定する
-        this.life = 1;
-    }
-
-    /**
-     * キャラクターの状態を更新し描画を行う
-     */
-    update(){
-        // もしショットのライフが 0 以下の場合はなにもしない
-        if(this.life <= 0){return;}
-        // もしショットが画面外へ移動していたらライフを 0（非生存の状態）に設定する
-        if(this.position.y + this.height < 0){
-            this.life = 0;
-        }
-        // ショットを進行方向に沿って移動させる
-        this.position.x += this.vector.x * this.speed;
-        this.position.y += this.vector.y * this.speed;
-
-        // 座標系の回転を考慮した描画を行う
-        this.rotationDraw();
-    }
-}
-
 class Card extends Character {
     /**
      * @constructor
@@ -543,4 +248,157 @@ class Card extends Character {
         // 念の為グローバルなアルファの状態を元に戻す
         this.ctx.globalAlpha = 1.0;
     }
+}
+
+/**
+ * 爆発エフェクトクラス
+ */
+class Explosion {
+    /**
+     * @constructor
+     * @param {CanvasRenderingContext2D} ctx - 描画などに利用する 2D コンテキスト
+     * @param {number} radius - 爆発の広がりの半径
+     * @param {number} count - 爆発の火花の数
+     * @param {number} size - 爆発の火花の大きさ（幅・高さ）
+     * @param {number} timeRange - 爆発が消えるまでの時間（秒単位）
+     * @param {string} [color='#ff1166'] - 爆発の色
+     */
+    constructor(ctx, radius, count, size, timeRange, color = '#ff1166'){
+        /**
+         * @type {CanvasRenderingContext2D}
+         */
+        this.ctx = ctx;
+        /**
+         * 爆発の生存状態を表すフラグ
+         * @type {boolean}
+         */
+        this.life = false;
+        /**
+         * 爆発を fill する際の色
+         * @type {string}
+         */
+        this.color = color;
+        /**
+         * 自身の座標
+         * @type {Position}
+         */
+        this.position = null;
+        /**
+         * 爆発の広がりの半径
+         * @type {number}
+         */
+        this.radius = radius;
+        /**
+         * 爆発の火花の数
+         * @type {number}
+         */
+        this.count = count;
+        /**
+         * 爆発が始まった瞬間のタイムスタンプ
+         * @type {number}
+         */
+        this.startTime = 0;
+        /**
+         * 爆発が消えるまでの時間
+         * @type {number}
+         */
+        this.timeRange = timeRange;
+        /**
+         * 火花のひとつあたりの最大の大きさ（幅・高さ）
+         * @type {number}
+         */
+        this.fireBaseSize = size;
+        /**
+         * 火花のひとつあたりの大きさを格納する
+         * @type {Array<Position>}
+         */
+        this.fireSize = [];
+        /**
+         * 火花の位置を格納する
+         * @type {Array<Position>}
+         */
+        this.firePosition = [];
+        /**
+         * 火花の進行方向を格納する
+         * @type {Array<Position>}
+         */
+        this.fireVector = [];
+    }
+
+    /**
+     * 爆発エフェクトを設定する
+     * @param {number} x - 爆発を発生させる X 座標
+     * @param {number} y - 爆発を発生させる Y 座標
+     */
+    set(x, y){
+        // 火花の個数分ループして生成する
+        for(let i = 0; i < this.count; ++i){
+            // 引数を元に位置を決める
+            this.firePosition[i] = new Position(x, y);
+            // ランダムに火花が進む方向（となるラジアン）を決める
+            let vr = Math.random() * Math.PI * 2.0;
+            // ラジアンを元にサインとコサインを生成し進行方向に設定する
+            let s = Math.sin(vr);
+            let c = Math.cos(vr);
+            // 進行方向ベクトルの長さをランダムに短くし移動量をランダム化する
+            let mr = Math.random();
+            this.fireVector[i] = new Position(c * mr, s * mr);
+            // 火花の大きさをランダム化する
+            this.fireSize[i] = (Math.random() * 0.5 + 0.5) * this.fireBaseSize;
+        }
+        // 爆発の生存状態を設定
+        this.life = true;
+        // 爆発が始まる瞬間のタイムスタンプを取得する
+        this.startTime = Date.now();
+    }
+
+    /**
+     * 爆発エフェクトを更新する
+     */
+    update(){
+        // 生存状態を確認する
+        if(this.life !== true){return;}
+        // 爆発エフェクト用の色を設定する
+        this.ctx.fillStyle = this.color;
+        this.ctx.globalAlpha = 0.5;
+        // 爆発が発生してからの経過時間を求める
+        let time = (Date.now() - this.startTime) / 1000;
+        // 爆発終了までの時間で正規化して進捗度合いを算出する
+        let ease = simpleEaseIn(1.0 - Math.min(time / this.timeRange, 1.0));
+        let progress = 1.0 - ease;
+
+        // 進捗度合いに応じた位置に火花を描画する
+        for(let i = 0; i < this.firePosition.length; ++i){
+            // 火花が広がる距離
+            let d = this.radius * progress;
+            // 広がる距離分だけ移動した位置
+            let x = this.firePosition[i].x + this.fireVector[i].x * d;
+            let y = this.firePosition[i].y + this.fireVector[i].y * d;
+            // 進捗を描かれる大きさにも反映させる
+            let s = 1.0 - progress;
+            // 矩形を描画する
+            this.ctx.fillRect(
+                x - (this.fireSize[i] * s) / 2,
+                y - (this.fireSize[i] * s) / 2,
+                this.fireSize[i] * s,
+                this.fireSize[i] * s
+            );
+        }
+
+        // 進捗が 100% 相当まで進んでいたら非生存の状態にする
+        if(progress >= 1.0){
+            this.life = false;
+        }
+    }
+}
+
+function simpleEaseIn(t){
+    return t * t * t * t;
+}
+
+// 得点の描画
+function updatePoint(ctx, util, mypoint, enemypoint, x, y, width){
+    ctx.font = 'bold 40px sans-serif';
+    util.drawText('Your Score:  ' + mypoint, x, y, 'black', width);
+    util.drawText('Enemy Score:  ' + enemypoint, x, y+160, 'black', width);
 }

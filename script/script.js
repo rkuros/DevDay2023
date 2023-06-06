@@ -54,6 +54,11 @@
      * @type {number}
      */
     const ROW_SPACE = 30;
+    /**
+     * 爆発エフェクトの最大個数
+     * @type {number}
+     */
+    const EXPLOSION_MAX_COUNT = 10;
     
  
     /**
@@ -126,7 +131,27 @@
      * @type {Array<card>}
      */
     let charengeCardNum = null;
-
+    /**
+     * 爆発エフェクトのインスタンスを格納する配列
+     * @type {Array<Explosion>}
+     */
+    let explosionArray = [];
+    /**
+     * 自分の得点
+     * @type {Array<Explosion>}
+     */
+    let myScore = 0;
+    /**
+     * 相手の得点
+     * @type {Array<Explosion>}
+     */
+    let enemyScore = 0;
+    /**
+     * スコアの位置
+     * @type {Array<Explosion>}
+     */
+    let scoreX = 800;
+    let scoreY = 90;
 
     /**
      * ページのロードが完了したときに発火する load イベント
@@ -139,7 +164,7 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        initializeWSconnection('ws://');
+        initializeWSconnection('ws://43.207.52.1:9002?playerSessionId=test');
         // 初期化処理を行う
         initialize();
         // インスタンスの状態を確認する
@@ -171,6 +196,11 @@
                     cardNum += 1;
                 }
             }
+        }
+
+        // 爆発エフェクトを初期化する
+        for(i = 0; i < EXPLOSION_MAX_COUNT; ++i){
+            explosionArray[i] = new Explosion(ctx, 150.0, 20, 50.0, 1.0);
         }
     }
 
@@ -264,12 +294,27 @@
                 scene.use(activeScene);
             }
 
-            //　ゲーム時のメッセージ受信イベントを定義
+            // ゲーム時のメッセージ受信イベントを定義
             wsConnection.onmessage = function(e) {
                 message = JSON.parse(e.data);            
                 console.log(message);
                 cardArray[message.card].setImagePath(message['picture']);
                 cardArray[message.card].setState(true);
+
+                // エフェクトの発生
+                for(let i = 0; i < explosionArray.length; ++i){
+                    // 発生していない爆発エフェクトがあれば対象の位置に生成する
+                    if(explosionArray[i].life !== true){
+                        let y = cardArray[message.card].position.getY();
+                        let x = cardArray[message.card].position.getX();
+                        explosionArray[i].set(x, y);
+                        break;
+                    }
+                }
+
+                // スコアの更新
+                myScore = message.your_score;
+                enemyScore = message.opponent_score;
                 
                 if(message['status'] === "challenging"){
                     //選んだ１枚目をキャッシュ
@@ -295,6 +340,9 @@
                     v.update();
                 });
 
+                // スコアを更新
+                updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
+
                 // ゲーム終了判定
                 if(openCardNum === CARD_COUNT){
                     activeScene = 'end';
@@ -315,6 +363,9 @@
                 cardArray.map((v) => {
                     v.update();
                 });
+
+                // スコアを更新
+                updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
 
                 // ゲーム終了判定
                 if(openCardNum === CARD_COUNT){
@@ -340,7 +391,6 @@
                     cardArray[charengeCardNum].setImagePath(picture[CARD_COUNT/2]);
                     cardArray[charengeCardNum].setState(false);
                 }
-                
                 // シーンを変更する
                 activeScene = 'choose';
                 scene.use(activeScene);
@@ -350,19 +400,31 @@
             cardArray.map((v) => {
                 v.update();
             });
-            util.drawText('stop', 150, 150, 'black', CANVAS_WIDTH/2);
+            // スコアを更新
+            updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
+
+            if(message['status'] === "Success"){
+                util.drawText('Success', 150, 150, 'black', CANVAS_WIDTH/2);
+            }else{
+                util.drawText('Failed', 150, 150, 'black', CANVAS_WIDTH/2);
+            }
         });
         // ゲーム終了シーン
         scene.add('end', (time) => {
-            // カードを更新する
-            cardArray.map((v) => {
-                v.update();
-            });
+
+            // スコアを更新
+            updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
 
             ctx.font = 'bold 150px sans-serif';
             util.drawText('Game Over', 150, 150, 'black', CANVAS_WIDTH/2);
             ctx.font = 'bold 50px sans-serif';
-            util.drawText('press Q', 300, 300, 'red', CANVAS_WIDTH/2);
+            util.drawText('press Q', 300, 500, 'red', CANVAS_WIDTH/2);
+
+            if(myScore >= enemyScore){
+                util.drawText('WIN', 300, 300, 'green', CANVAS_WIDTH/2);
+            }else{
+                util.drawText('LOSE', 300, 300, 'green', CANVAS_WIDTH/2);
+            }
 
             // Qでシーンを userpage に変更する
             if(window.isKeyDown.key_q === true && keyUp === true){
@@ -476,6 +538,11 @@
 
         // シーンを更新する
         scene.update();
+    
+        // 爆発エフェクトの状態を更新する
+        explosionArray.map((v) => {
+            v.update();
+        });     
 
         // 恒常ループのために描画処理を再帰呼出しする
         requestAnimationFrame(render);
