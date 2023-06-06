@@ -59,6 +59,11 @@
      * @type {number}
      */
     const EXPLOSION_MAX_COUNT = 10;
+    /**
+     * Cognito Identity Pool ID
+     * @type {number}
+     */
+    const IDENTITYPOOLID = 'ap-northeast-1:8fb75855-967f-4b01-aea4-4eb49a1f15fc';
     
  
     /**
@@ -152,6 +157,20 @@
      */
     let scoreX = 800;
     let scoreY = 90;
+    /**
+     * Cognitoインスタンス用
+     * @type {Array<Explosion>}
+     */
+    let cognitoidentity = null;
+    /**
+     * Cognito Identity
+     * @type {Array<Explosion>}
+     */
+    let identityId = null;
+    let accessKeyId = null;
+    let secretKey = null;
+    let sessionToken = null;
+
 
     /**
      * ページのロードが完了したときに発火する load イベント
@@ -164,7 +183,7 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        initializeWSconnection('ws://');
+        initializeWSconnection('ws://43.207.52.1:9002?playerSessionId=test');
         // 初期化処理を行う
         initialize();
         // インスタンスの状態を確認する
@@ -202,6 +221,13 @@
         for(i = 0; i < EXPLOSION_MAX_COUNT; ++i){
             explosionArray[i] = new Explosion(ctx, 150.0, 20, 50.0, 1.0);
         }
+
+        // Amazon Cognito 認証情報プロバイダーを初期化します
+        AWS.config.region = 'ap-northeast-1'; // リージョン
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId: IDENTITYPOOLID,
+        });
+        cognitoidentity = new AWS.CognitoIdentity();
     }
 
     /**
@@ -270,8 +296,58 @@
         // ログインシーン
         scene.add('login', (time) => {
             util.drawText('Login', 150, 150, 'black', CANVAS_WIDTH/2);
-            // 2 秒経過したらシーンを card に変更する
-            if(time > 2.0){
+            ctx.font = 'bold 50px sans-serif';
+            util.drawText('pressEnter', 300, 300, 'red', CANVAS_WIDTH/2);
+
+            // Enterでシーンを card に変更する
+            if(window.isKeyDown.key_Enter === true && keyUp === true){
+                // Cognito Identity IDの取得
+                let params = {
+                    IdentityPoolId: IDENTITYPOOLID, /* required */
+                    /*AccountId: 'STRING_VALUE',
+                    Logins: {
+                      '<IdentityProviderName>': 'STRING_VALUE',
+                      /* '<IdentityProviderName>': ... 
+                    }*/
+                };
+                cognitoidentity.getId(params, function(err, data) {
+                    if(err){
+                        // an error occurred
+                        console.log(err, err.stack);
+                    } 
+                    else{
+                        // successful response
+                        identityId = data['IdentityId'];
+                        console.log(data);
+                    }         
+                });
+
+                keyUp = false;
+            }
+
+            if(identityId !== null){
+                // 一時的なIAMクレデンシャルの取得
+                params = {
+                    IdentityId: identityId, /* required */
+                    /*CustomRoleArn: 'STRING_VALUE',
+                    Logins: {
+                      '<IdentityProviderName>': 'STRING_VALUE',
+                      /* '<IdentityProviderName>': ... 
+                    }*/
+                };
+                cognitoidentity.getCredentialsForIdentity(params, function(err, data) {
+                    if(err){
+                        // an error occurred
+                        console.log(err, err.stack);
+                    }else{
+                        // successful response
+                        console.log(data);
+                        accessKeyId = data['Credentials']['AccessKeyId'];
+                        secretKey = data['Credentials']['SecretKey'];
+                        sessionToken = data['Credentials']['SessionToken'];
+                    }
+                });
+
                 activeScene = 'userpage';
                 scene.use(activeScene);
             }
@@ -279,6 +355,11 @@
         // ユーザーページ
         scene.add('userpage', (time) => {
             util.drawText('User Page', 150, 150, 'black', CANVAS_WIDTH/2);
+            ctx.font = 'bold 30px sans-serif';
+            util.drawText('accessKeyId: '+accessKeyId, 250, 250, 'red', CANVAS_WIDTH);
+            util.drawText('secretKey: '+secretKey, 300, 300, 'red', CANVAS_WIDTH);
+            util.drawText('sessionToken: '+sessionToken, 350, 350, 'red', CANVAS_WIDTH);
+
             // 2 秒経過したらシーンを card に変更する
             if(time > 2.0){
                 activeScene = 'matching';
