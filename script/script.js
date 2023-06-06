@@ -127,8 +127,6 @@
      */
     let charengeCardNum = null;
 
-    const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    
 
     /**
      * ページのロードが完了したときに発火する load イベント
@@ -141,23 +139,7 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        wsConnection = new WebSocket('ws://');
-        console.log("コネクションを開始しします。");
-            //コネクションが接続された時の動き
-        wsConnection.onopen = function(e) {
-            console.log("コネクションを開始しました。");
-        };
-            //エラーが発生したされた時の動き
-        wsConnection.onerror = function(error) {
-            console.log("エラーが発生しました。");
-        };
-        // メッセージを受信したらmessageに保存
-        wsConnection.onmessage = function(e) {
-            message = JSON.parse(e.data);            
-            console.log(message);
-            console.log(message['card']);
-        }
-
+        initializeWSconnection('ws://');
         // 初期化処理を行う
         initialize();
         // インスタンスの状態を確認する
@@ -168,8 +150,6 @@
      * canvas やコンテキストを初期化する
      */
     function initialize(){
-        let i;
-
         // canvas の大きさを設定
         canvas.width = CANVAS_WIDTH;
         canvas.height = CANVAS_HEIGHT;
@@ -185,7 +165,6 @@
         for(i = 0; i < COLUMN_COUNT; ++i){
             for(j = 0; j < ROW_COUNT; ++j){
                 cardArray[cardNum] = new Card(ctx, j*(ROW_SPACE+CARD_WIDTH)+(ROW_SPACE/2+CARD_WIDTH/2), i*(COLUMN_SPACE+CARD_HEIGHT)+(COLUMN_SPACE/2+CARD_HEIGHT/2), CARD_WIDTH, CARD_HEIGHT, picture[CARD_COUNT/2]);
-
                 if(cardNum === CARD_COUNT){
                     break;
                 }else{
@@ -246,13 +225,6 @@
     function sceneSetting(){
         // イントロシーン
         scene.add('intro', (time) => {
-            // メッセージを受信後の挙動
-            wsConnection.onmessage = function(e) {
-                message = JSON.parse(e.data);            
-                console.log(message);
-                console.log(message['card']);
-            }
-            
             ctx.font = 'bold 150px sans-serif';
             util.drawText('GameStart', 150, 150, 'black', CANVAS_WIDTH/2);
             ctx.font = 'bold 50px sans-serif';
@@ -288,38 +260,35 @@
             util.drawText('Matching Page', 150, 150, 'black', CANVAS_WIDTH/2);
             // 2 秒経過したらシーンを card に変更する
             if(time > 2.0){
-                activeScene = 'chose';
+                activeScene = 'choose';
                 scene.use(activeScene);
             }
-        });
-        // カード選択ページ
-        scene.add('chose', (time) => {
+
+            //　ゲーム時のメッセージ受信イベントを定義
             wsConnection.onmessage = function(e) {
                 message = JSON.parse(e.data);            
                 console.log(message);
-                console.log(message['card']);
                 cardArray[message.card].setImagePath(message['picture']);
                 cardArray[message.card].setState(true);
-                //await _sleep(2000);
+                
                 if(message['status'] === "challenging"){
+                    //選んだ１枚目をキャッシュ
                     charengeCardNum = message['card'];
-                    //console.log(message['card']);
+                }else{
+                    // シーンをstopに変更
+                    activeScene = 'stop';
+                    scene.use(activeScene);
                 }
-                if(message['status'] === "Success"){
-                    openCardNum += 2;
-                }
-                if(message['status'] === "Failed"){
-                    cardArray[message.card].setImagePath(picture[CARD_COUNT/2]);
-                    cardArray[message.card].setState(false);
-                    cardArray[charengeCardNum].setImagePath(picture[CARD_COUNT/2]);
-                    cardArray[charengeCardNum].setState(false);
-                }
-                //openCardNum += 1;
             }
+        });
+        // カード選択ページ
+        scene.add('choose', (time) => {
             // 自分が選択者かの確認
             if(message['your_turn'] === true){
                 // カーソルのイベントチェック
                 cursorUpdate();
+                // Submitのチェック
+                challengeSubmit();
 
                 // カードを更新する
                 cardArray.map((v) => {
@@ -336,31 +305,8 @@
                 scene.use(activeScene);
             }
         });
-        // カード選択結果取得待ち
+        // 相手がカードを選んでいるときのシーン
         scene.add('wait', (time) => {
-            // メッセージを受信後の挙動
-            wsConnection.onmessage = function(e) {
-                message = JSON.parse(e.data);            
-                console.log(message);
-                console.log(message['card']);
-                cardArray[message.card].setImagePath(message['picture']);
-                cardArray[message.card].setState(true);
-                //await _sleep(2000);
-                if(message['status'] === "challenging"){
-                    charengeCardNum = message['card'];
-                    //console.log(message['card']);
-                }
-                if(message['status'] === "Success"){
-                    openCardNum += 2;
-                }
-                if(message['status'] === "Failed"){
-                    cardArray[message.card].setImagePath(picture[CARD_COUNT/2]);
-                    cardArray[message.card].setState(false);
-                    cardArray[charengeCardNum].setImagePath(picture[CARD_COUNT/2]);
-                    cardArray[charengeCardNum].setState(false);
-                }
-                //openCardNum += 1;
-            }
             if(message['your_turn'] === false){
                 ctx.font = 'bold 150px sans-serif';
                 util.drawText('Chosing wait', 150, 150, 'black', CANVAS_WIDTH/2);
@@ -376,9 +322,35 @@
                     scene.use(activeScene);
                 }
             }else{
-                activeScene = 'chose';
+                
+            }
+        });
+        // 結果待機シーン
+        scene.add('stop', (time) => {
+            // 1 秒経過したらシーンを choose に変更する
+            if(time > 1.0){
+                // Success ならカードのオープンになったカードの枚数を表示
+                if(message['status'] === "Success"){
+                    openCardNum += 2;
+                }
+                // 失敗していたらカードを裏に戻す
+                if(message['status'] === "Failed"){
+                    cardArray[message.card].setImagePath(picture[CARD_COUNT/2]);
+                    cardArray[message.card].setState(false);
+                    cardArray[charengeCardNum].setImagePath(picture[CARD_COUNT/2]);
+                    cardArray[charengeCardNum].setState(false);
+                }
+                
+                // シーンを変更する
+                activeScene = 'choose';
                 scene.use(activeScene);
             }
+            
+            // カードを更新する
+            cardArray.map((v) => {
+                v.update();
+            });
+            util.drawText('stop', 150, 150, 'black', CANVAS_WIDTH/2);
         });
         // ゲーム終了シーン
         scene.add('end', (time) => {
@@ -450,23 +422,44 @@
 
         // カーソルの番号を更新
         cardArray[cursorNum].setCursor(true);
+    }
 
+    /**
+     * カードをSubmitする関数
+     */
+    function challengeSubmit(){
         // カードを決定
         if(window.isKeyDown.key_Enter === true){
             // カードの状態が裏ならエンター処理
             if(cardArray[cursorNum].getState() === false){
-                //cardArray[cursorNum].setImagePath(picture[Math.floor( Math.random() * (7 + 1 - 0) ) + 0]);
-                //cardArray[cursorNum].setState(true);
                 // 選択したカードをサーバーに送信
-                let a = {"card": cursorNum};
-                console.log("Submit"+JSON.stringify(a));
-                wsConnection.send(JSON.stringify(a));
-                // 現在のカードがオープンされた数
-                //openCardNum += 1;
-                // シーンをCharangeに変更
-                activeScene = 'charange';
-                scene.use(activeScene);
+                let submitMessage = {"card": cursorNum};
+                console.log("Submit"+JSON.stringify(submitMessage));
+                wsConnection.send(JSON.stringify(submitMessage));
             }
+        }
+    }
+
+    /**
+     * WebSocketへの接続処理
+     */
+    function initializeWSconnection(ip){
+        // WebSocketのコネクションを確立
+        wsConnection = new WebSocket(ip);
+        console.log("コネクションを開始しします。");
+            //コネクションが接続された時の動き
+        wsConnection.onopen = function(e) {
+            console.log("コネクションを開始しました。");
+        };
+            //エラーが発生したされた時の動き
+        wsConnection.onerror = function(error) {
+            console.log("エラーが発生しました。");
+        };
+        // メッセージを受信したらmessageに保存
+        wsConnection.onmessage = function(e) {
+            message = JSON.parse(e.data);            
+            console.log(message);
+            console.log(message['card']);
         }
     }
 
