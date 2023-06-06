@@ -164,7 +164,7 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        initializeWSconnection('ws://43.207.52.1:9002?playerSessionId=test');
+        initializeWSconnection('ws://');
         // 初期化処理を行う
         initialize();
         // インスタンスの状態を確認する
