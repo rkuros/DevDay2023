@@ -323,6 +323,11 @@ class Explosion {
          * @type {Array<Position>}
          */
         this.fireVector = [];
+        /**
+         * サウンド再生のための Sound クラスのインスタンス
+         * @type {Sound}
+         */
+        this.sound = null;
     }
 
     /**
@@ -350,6 +355,18 @@ class Explosion {
         this.life = true;
         // 爆発が始まる瞬間のタイムスタンプを取得する
         this.startTime = Date.now();
+
+        // サウンド再生の準備ができていたら、再生する
+        if(this.sound != null){
+            this.sound.play();
+        }
+    }
+
+    /**
+     * Sound クラスのインスタンスを受け取り自身のプロパティとして保持する
+     */
+    setSound(sound){
+        this.sound = sound;
     }
 
     /**

@@ -170,7 +170,11 @@
     let accessKeyId = null;
     let secretKey = null;
     let sessionToken = null;
-
+    /**
+     * 効果音再生のための Sound クラスのインスタンス
+     * @type {Sound}
+     */
+    let sound = null;
 
     /**
      * ページのロードが完了したときに発火する load イベント
@@ -183,20 +187,37 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        initializeWSconnection('ws://43.207.52.1:9002?playerSessionId=test');
-        // 初期化処理を行う
-        initialize();
+        initializeWSconnection('ws://');
+        // canvas の大きさを設定
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        // ユーザーがクリック操作を行った際に初めてオーディオ関連の処理を開始する
+        sound = new Sound();
+        // 音声データを読み込み、準備完了してから初期化処理を行う
+        sound.load('./sound/clearsky.mp3', (error) => {
+            // もしエラーが発生した場合はアラートを表示して終了する
+            if(error != null){
+                alert('ファイルの読み込みエラーです');
+                return;
+            }
+            // 初期化処理を行う
+            initialize();
+            // インスタンスの状態を確認する
+            loadCheck();
+        });
+
+        // 期化処理を行う
+        //initialize();
         // インスタンスの状態を確認する
-        loadCheck();
+        //loadCheck();
+
     }, false);
 
     /**
      * canvas やコンテキストを初期化する
      */
     function initialize(){
-        // canvas の大きさを設定
-        canvas.width = CANVAS_WIDTH;
-        canvas.height = CANVAS_HEIGHT;
 
         // シーンを初期化する
         scene = new SceneManager();
@@ -220,6 +241,8 @@
         // 爆発エフェクトを初期化する
         for(i = 0; i < EXPLOSION_MAX_COUNT; ++i){
             explosionArray[i] = new Explosion(ctx, 150.0, 20, 50.0, 1.0);
+            // 爆発エフェクト発生時に効果音を再生できるよう設定する
+            explosionArray[i].setSound(sound);
         }
 
         // Amazon Cognito 認証情報プロバイダーを初期化します
@@ -350,6 +373,8 @@
 
                 activeScene = 'userpage';
                 scene.use(activeScene);
+                // BGM再生
+                sound.play();
             }
         });
         // ユーザーページ
