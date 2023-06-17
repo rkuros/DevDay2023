@@ -17,6 +17,8 @@ class Sound {
          * @type {AudioBuffer}
          */
         this.source = null;
+
+        this.node = null;
     }
     /**
      * オーディオファイルをロードする
@@ -50,22 +52,49 @@ class Sound {
      */
     play(){
         // ノードを生成する
-        let node = new AudioBufferSourceNode(this.ctx, {buffer: this.source});
+        this.node = new AudioBufferSourceNode(this.ctx, {buffer: this.source});
         // ノードを接続する
-        node.connect(this.ctx.destination);
+        this.node.connect(this.ctx.destination);
         // ノードの再生が完了した後の解放処理を設定しておく
-        node.addEventListener('ended', () => {
+        this.node.addEventListener('ended', () => {
             // 念のため stop を実行
-            node.stop();
+            //this.node.stop();
             // ノードの接続を解除する
-            node.disconnect();
+            //this.node.disconnect();
             // ノードをガベージコレクタが解放するように null でリセットしておく
-            node = null;
+            //this.node = null;
+        }, false);
+        // ノードの再生を開始する
+        this.node.start();
+    }
+    playloop(){
+        // ノードを生成する
+        this.node = new AudioBufferSourceNode(this.ctx, {buffer: this.source});
+        // ノードを接続する
+        this.node.connect(this.ctx.destination);
+        // ノードの再生が完了した後の解放処理を設定しておく
+        this.node.addEventListener('ended', () => {
+            // 念のため stop を実行
+            this.node.stop();
+            // ノードの接続を解除する
+            this.node.disconnect();
+            // ノードをガベージコレクタが解放するように null でリセットしておく
+            this.node = null;
             // ループ
             this.play();
         }, false);
         // ノードの再生を開始する
-        node.start();
+        this.node.start();
+    }
+
+    // 音声の停止
+    stop(){
+        // 念のため stop を実行
+        this.node.stop();
+        // ノードの接続を解除する
+        this.node.disconnect();
+        // ノードをガベージコレクタが解放するように null でリセットしておく
+        this.node = null;
     }
 }
 

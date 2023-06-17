@@ -63,7 +63,22 @@
      * Cognito Identity Pool ID
      * @type {number}
      */
-    const IDENTITYPOOLID = 'ap-northeast-1:8fb75855-967f-4b01-aea4-4eb49a1f15fc';
+    const IDENTITYPOOLID = '';
+     /**
+      * 背景を流れる星の個数
+      * @type {number}
+      */
+     const BACKGROUND_STAR_MAX_COUNT = 100;
+     /**
+      * 背景を流れる星の最大サイズ
+      * @type {number}
+      */
+     const BACKGROUND_STAR_MAX_SIZE = 3;
+     /**
+      * 背景を流れる星の最大速度
+      * @type {number}
+      */
+     const BACKGROUND_STAR_MAX_SPEED = 4;
     
  
     /**
@@ -174,7 +189,13 @@
      * 効果音再生のための Sound クラスのインスタンス
      * @type {Sound}
      */
-    let sound = null;
+    let bgm = null;
+    let flipsound = null;
+    /**
+     * 流れる星のインスタンスを格納する配列
+     * @type {Array<BackgroundStar>}
+     */
+    let backgroundStarArray = [];
 
     /**
      * ページのロードが完了したときに発火する load イベント
@@ -187,30 +208,34 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        initializeWSconnection('ws://');
+        initializeWSconnection('');
         // canvas の大きさを設定
         canvas.width = CANVAS_WIDTH;
         canvas.height = CANVAS_HEIGHT;
 
         // ユーザーがクリック操作を行った際に初めてオーディオ関連の処理を開始する
-        sound = new Sound();
+        bgm = new Sound();
+        flipsound = new Sound();
         // 音声データを読み込み、準備完了してから初期化処理を行う
-        sound.load('./sound/clearsky.mp3', (error) => {
+        bgm.load('./sound/clearsky.mp3', (error) => {
             // もしエラーが発生した場合はアラートを表示して終了する
             if(error != null){
                 alert('ファイルの読み込みエラーです');
                 return;
             }
-            // 初期化処理を行う
-            initialize();
-            // インスタンスの状態を確認する
-            loadCheck();
+        });
+        flipsound.load('./sound/open.mp3', (error) => {
+            // もしエラーが発生した場合はアラートを表示して終了する
+            if(error != null){
+                alert('ファイルの読み込みエラーです');
+                return;
+            }
         });
 
         // 期化処理を行う
-        //initialize();
+        initialize();
         // インスタンスの状態を確認する
-        //loadCheck();
+        loadCheck();
 
     }, false);
 
@@ -242,7 +267,20 @@
         for(i = 0; i < EXPLOSION_MAX_COUNT; ++i){
             explosionArray[i] = new Explosion(ctx, 150.0, 20, 50.0, 1.0);
             // 爆発エフェクト発生時に効果音を再生できるよう設定する
-            explosionArray[i].setSound(sound);
+            explosionArray[i].setSound(flipsound);
+        }
+
+        // 流れる星を初期化する
+        for(i = 0; i < BACKGROUND_STAR_MAX_COUNT; ++i){
+            // 星の速度と大きさはランダムと最大値によって決まるようにする
+            let size  = 1 + Math.random() * (BACKGROUND_STAR_MAX_SIZE - 1);
+            let speed = 1 + Math.random() * (BACKGROUND_STAR_MAX_SPEED - 1);
+            // 星のインスタンスを生成する
+            backgroundStarArray[i] = new BackgroundStar(ctx, size, speed);
+            // 星の初期位置もランダムに決まるようにする
+            let x = Math.random() * CANVAS_WIDTH;
+            let y = Math.random() * CANVAS_HEIGHT;
+            backgroundStarArray[i].set(x, y);
         }
 
         // Amazon Cognito 認証情報プロバイダーを初期化します
@@ -374,7 +412,7 @@
                 activeScene = 'userpage';
                 scene.use(activeScene);
                 // BGM再生
-                sound.play();
+                bgm.playloop();
             }
         });
         // ユーザーページ
@@ -398,38 +436,41 @@
             if(time > 2.0){
                 activeScene = 'choose';
                 scene.use(activeScene);
-            }
 
-            // ゲーム時のメッセージ受信イベントを定義
-            wsConnection.onmessage = function(e) {
-                message = JSON.parse(e.data);            
-                console.log(message);
-                cardArray[message.card].setImagePath(message['picture']);
-                cardArray[message.card].setState(true);
+                // ゲーム時のメッセージ受信イベントを定義
+                wsConnection.onmessage = function(e) {
+                    message = JSON.parse(e.data);            
+                    console.log(message);
+                    cardArray[message.card].setImagePath(message['picture']);
+                    cardArray[message.card].setState(true);
 
-                // エフェクトの発生
-                for(let i = 0; i < explosionArray.length; ++i){
-                    // 発生していない爆発エフェクトがあれば対象の位置に生成する
-                    if(explosionArray[i].life !== true){
-                        let y = cardArray[message.card].position.getY();
-                        let x = cardArray[message.card].position.getX();
-                        explosionArray[i].set(x, y);
-                        break;
+                    // エフェクトの発生
+                    for(let i = 0; i < explosionArray.length; ++i){
+                        // 発生していない爆発エフェクトがあれば対象の位置に生成する
+                        if(explosionArray[i].life !== true){
+                            let y = cardArray[message.card].position.getY();
+                            let x = cardArray[message.card].position.getX();
+                            explosionArray[i].set(x, y);
+                            break;
+                        }
+                    }
+
+                    // スコアの更新
+                    myScore = message.your_score;
+                    enemyScore = message.opponent_score;
+                    
+                    if(message['status'] === "challenging"){
+                        //選んだ１枚目をキャッシュ
+                        charengeCardNum = message['card'];
+                    }else{
+                        // シーンをstopに変更
+                        activeScene = 'stop';
+                        scene.use(activeScene);
                     }
                 }
 
-                // スコアの更新
-                myScore = message.your_score;
-                enemyScore = message.opponent_score;
-                
-                if(message['status'] === "challenging"){
-                    //選んだ１枚目をキャッシュ
-                    charengeCardNum = message['card'];
-                }else{
-                    // シーンをstopに変更
-                    activeScene = 'stop';
-                    scene.use(activeScene);
-                }
+                // BGM停止
+                bgm.stop();
             }
         });
         // カード選択ページ
@@ -440,6 +481,11 @@
                 cursorUpdate();
                 // Submitのチェック
                 challengeSubmit();
+
+                // 背景エフェクトの状態を更新する
+                backgroundStarArray.map((v) => {
+                    v.update();
+                });                
 
                 // カードを更新する
                 cardArray.map((v) => {
@@ -464,7 +510,12 @@
             if(message['your_turn'] === false){
                 ctx.font = 'bold 150px sans-serif';
                 util.drawText('Chosing wait', 150, 150, 'black', CANVAS_WIDTH/2);
-    
+
+                // 背景エフェクトの状態を更新する
+                backgroundStarArray.map((v) => {
+                    v.update();
+                });
+
                 // カードを更新する
                 cardArray.map((v) => {
                     v.update();
@@ -502,6 +553,10 @@
                 scene.use(activeScene);
             }
             
+            // 背景エフェクトの状態を更新する
+            backgroundStarArray.map((v) => {
+                v.update();
+            });
             // カードを更新する
             cardArray.map((v) => {
                 v.update();
@@ -517,7 +572,10 @@
         });
         // ゲーム終了シーン
         scene.add('end', (time) => {
-
+            // 爆発エフェクトの状態を更新する
+            explosionArray.map((v) => {
+                v.update();
+            });
             // スコアを更新
             updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
 
@@ -638,17 +696,22 @@
         // グローバルなアルファを必ず 1.0 で描画処理を開始する
         ctx.globalAlpha = 1.0;
         // 描画前に画面全体を不透明な明るいグレーで塗りつぶす
-        util.drawRect(0, 0, canvas.width, canvas.height, '#eeeeee');
+        util.drawRect(0, 0, canvas.width, canvas.height, '#111122');
         // 現在までの経過時間を取得する（ミリ秒を秒に変換するため 1000 で除算）
         let nowTime = (Date.now() - startTime) / 1000;
 
         // シーンを更新する
         scene.update();
+        /*
+        // 流れる星の状態を更新する
+        backgroundStarArray.map((v) => {
+            v.update();
+        });*/
     
         // 爆発エフェクトの状態を更新する
         explosionArray.map((v) => {
             v.update();
-        });     
+        });
 
         // 恒常ループのために描画処理を再帰呼出しする
         requestAnimationFrame(render);
