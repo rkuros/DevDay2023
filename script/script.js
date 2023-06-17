@@ -68,7 +68,7 @@
       * 背景を流れる星の個数
       * @type {number}
       */
-     const BACKGROUND_STAR_MAX_COUNT = 100;
+     const BACKGROUND_STAR_MAX_COUNT = 130;
      /**
       * 背景を流れる星の最大サイズ
       * @type {number}
@@ -196,6 +196,13 @@
      * @type {Array<BackgroundStar>}
      */
     let backgroundStarArray = [];
+    /**
+     * ユーザーのコンポーネントを格納する
+     * @type {Array<BackgroundStar>}
+     */
+    let user = null;
+
+    let matchFlag = 1;
 
     /**
      * ページのロードが完了したときに発火する load イベント
@@ -207,8 +214,6 @@
         canvas = util.canvas;
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
-        // WebSocketのコネクションを確立
-        initializeWSconnection('ws://43.207.52.1:9002?playerSessionId=test');
         // canvas の大きさを設定
         canvas.width = CANVAS_WIDTH;
         canvas.height = CANVAS_HEIGHT;
@@ -250,19 +255,6 @@
         // 画像のパスのリストを取得
         imageGet();
 
-        // カードの初期化
-        let cardNum = 0;
-        for(i = 0; i < COLUMN_COUNT; ++i){
-            for(j = 0; j < ROW_COUNT; ++j){
-                cardArray[cardNum] = new Card(ctx, j*(ROW_SPACE+CARD_WIDTH)+(ROW_SPACE/2+CARD_WIDTH/2)+140, i*(COLUMN_SPACE+CARD_HEIGHT)+(COLUMN_SPACE/2+CARD_HEIGHT/2)+20, CARD_WIDTH, CARD_HEIGHT, picture[CARD_COUNT/2]);
-                if(cardNum === CARD_COUNT){
-                    break;
-                }else{
-                    cardNum += 1;
-                }
-            }
-        }
-
         // 爆発エフェクトを初期化する
         for(i = 0; i < EXPLOSION_MAX_COUNT; ++i){
             explosionArray[i] = new Explosion(ctx, 150.0, 20, 50.0, 1.0);
@@ -281,11 +273,12 @@
             }
             // 星のインスタンスを生成する
             backgroundStarArray[i] = new BackgroundStar(ctx, size, speedX, speedY);
-            // 星の初期位置もランダムに決まるようにする
-            //let x = Math.random() * CANVAS_WIDTH;
-            //let y = Math.random() * CANVAS_HEIGHT;
+            // 星の初期位置
             backgroundStarArray[i].set(CANVAS_WIDTH/2, CANVAS_HEIGHT/2-10);
         }
+
+        // ユーザページのコンポーネント初期化
+        user = new Card(ctx, 150, 200, 200, 220, picture[generateRandomInt(3)+CARD_COUNT/2+1]);
 
         // Amazon Cognito 認証情報プロバイダーを初期化します
         AWS.config.region = 'ap-northeast-1'; // リージョン
@@ -421,28 +414,71 @@
         });
         // ユーザーページ
         scene.add('userpage', (time) => {
-            util.drawText('User Page', 150, 150, 'black', CANVAS_WIDTH/2);
             ctx.font = 'bold 30px sans-serif';
-            util.drawText('accessKeyId: '+accessKeyId, 250, 250, 'red', CANVAS_WIDTH);
-            util.drawText('secretKey: '+secretKey, 300, 300, 'red', CANVAS_WIDTH);
-            util.drawText('sessionToken: '+sessionToken, 350, 350, 'red', CANVAS_WIDTH);
+            util.drawText('user 1', 100, 340, 'white', CANVAS_WIDTH);
+            ctx.font = 'bold 20px sans-serif';
+            util.drawText('accessKeyId: '+accessKeyId, 300, 150, 'red', CANVAS_WIDTH);
+            util.drawText('secretKey: '+secretKey, 300, 200, 'red', CANVAS_WIDTH);
+            util.drawText('sessionToken: '+sessionToken, 300, 250, 'red', CANVAS_WIDTH);
+            ctx.font = 'bold 70px sans-serif';
+            util.drawText('Game Start', 300, 680, 'Cyan', CANVAS_WIDTH);
+            ctx.font = 'bold 30px sans-serif';
+            util.drawText('press M', 440, 720, 'Cyan', CANVAS_WIDTH);
 
-            // 2 秒経過したらシーンを card に変更する
-            if(time > 2.0){
+
+            // Mでシーンを card に変更する
+            if(window.isKeyDown.key_m === true && keyUp === true){
                 activeScene = 'matching';
                 scene.use(activeScene);
+                keyUp = false;
             }
+
+            // ユーザページのコンポーネント表示
+            user.update();
+            
         });
         // マッチングシーン
         scene.add('matching', (time) => {
-            util.drawText('Matching Page', 150, 150, 'black', CANVAS_WIDTH/2);
             // 背景エフェクトの状態を更新する
             backgroundStarArray.map((v) => {
                 v.update();
-            });  
+            }); 
+
+            // 点滅する待機文字
+            ctx.font = 'bold 50px sans-serif';
+            ctx.globalAlpha = Math.abs(Math.sin((Date.now() - time)/1000));
+            util.drawText('Now Matching...', 300, 350, 'yellow', CANVAS_WIDTH/2);
+            ctx.globalAlpha = 1.0;
+
+            // WebSocketのコネクションを確立
+            if (matchFlag === 1){
+                initializeWSconnection('ws://43.207.52.1:9002?playerSessionId=test');
+                matchFlag = 0;
+            }
+
+            // メッセージを受信してstartなら後続処理
+            wsConnection.onmessage = function(e) {
+                message = JSON.parse(e.data);            
+                console.log(message);
+                if(message['status'] === "start"){
+                    picture[CARD_COUNT/2] = message['picture'];
+                }
+                // カードの初期化
+                let cardNum = 0;
+                for(i = 0; i < COLUMN_COUNT; ++i){
+                    for(j = 0; j < ROW_COUNT; ++j){
+                        cardArray[cardNum] = new Card(ctx, j*(ROW_SPACE+CARD_WIDTH)+(ROW_SPACE/2+CARD_WIDTH/2)+140, i*(COLUMN_SPACE+CARD_HEIGHT)+(COLUMN_SPACE/2+CARD_HEIGHT/2)+20, CARD_WIDTH, CARD_HEIGHT, picture[CARD_COUNT/2]);
+                        if(cardNum === CARD_COUNT){
+                            break;
+                        }else{
+                            cardNum += 1;
+                        }
+                    }
+                }
+            }
             
-            // 2 秒経過したらシーンを card に変更する
-            if(time > 2.0){
+            // 7 秒経過したらシーンを card に変更する
+            if(time > 7.0){
                 activeScene = 'choose';
                 scene.use(activeScene);
 
@@ -477,7 +513,6 @@
                         scene.use(activeScene);
                     }
                 }
-
                 // BGM停止
                 bgm.stop();
             }
@@ -503,6 +538,7 @@
 
                 // スコアを更新
                 updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
+                util.drawCircle(scoreX-30, scoreY-11, 17, color='cyan');
 
                 // ゲーム終了判定
                 if(openCardNum === CARD_COUNT){
@@ -532,6 +568,7 @@
 
                 // スコアを更新
                 updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
+                util.drawCircle(scoreX+220, scoreY-11, 17, color='cyan');
 
                 // ゲーム終了判定
                 if(openCardNum === CARD_COUNT){
@@ -545,7 +582,7 @@
         // 結果待機シーン
         scene.add('stop', (time) => {
             // 1 秒経過したらシーンを choose に変更する
-            if(time > 1.0){
+            if(time > 1.4){
                 // Success ならカードのオープンになったカードの枚数を表示
                 if(message['status'] === "Success"){
                     openCardNum += 2;
@@ -574,13 +611,19 @@
             updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
 
             if(message['status'] === "Success"){
-                util.drawText('Success', 150, 150, 'black', CANVAS_WIDTH/2);
+                ctx.font = 'bold 60px sans-serif';
+                util.drawText('SUCCESS', 380, 400, 'yellow', CANVAS_WIDTH/2);
             }else{
-                util.drawText('Failed', 150, 150, 'black', CANVAS_WIDTH/2);
+                ctx.font = 'bold 60px sans-serif';
+                util.drawText('FAILED', 400, 400, 'yellow', CANVAS_WIDTH/2);
             }
         });
         // ゲーム終了シーン
         scene.add('end', (time) => {
+            // 背景エフェクトの状態を更新する
+            backgroundStarArray.map((v) => {
+                v.update();
+            });                
             // 爆発エフェクトの状態を更新する
             explosionArray.map((v) => {
                 v.update();
@@ -588,15 +631,17 @@
             // スコアを更新
             updatePoint(ctx, util, myScore, enemyScore, scoreX, scoreY, CANVAS_WIDTH/2);
 
-            ctx.font = 'bold 150px sans-serif';
-            util.drawText('Game Over', 150, 150, 'black', CANVAS_WIDTH/2);
+            ctx.font = 'bold 70px sans-serif';
+            util.drawText('Game Over', 300, 80, 'white', CANVAS_WIDTH);
             ctx.font = 'bold 50px sans-serif';
-            util.drawText('press Q', 300, 500, 'red', CANVAS_WIDTH/2);
+            util.drawText('press Q', 410, 460, 'red', CANVAS_WIDTH/2);
 
             if(myScore >= enemyScore){
-                util.drawText('WIN', 300, 300, 'green', CANVAS_WIDTH/2);
+                ctx.font = 'bold 150px sans-serif';
+                util.drawText('WIN', 350, 400, 'Yellow', CANVAS_WIDTH/2);
             }else{
-                util.drawText('LOSE', 300, 300, 'green', CANVAS_WIDTH/2);
+                ctx.font = 'bold 150px sans-serif';
+                util.drawText('LOSE', 300, 400, 'Yellow', CANVAS_WIDTH/2);
             }
 
             // Qでシーンを userpage に変更する
@@ -604,6 +649,11 @@
                 activeScene = 'userpage';
                 scene.use(activeScene);
                 keyUp = false;
+                // BGM再生
+                bgm.playloop();
+                wsConnection.close();
+                matchFlag = 1;
+                openCardNum = 0;
             }
         });
 
@@ -624,6 +674,9 @@
         picture[6] = './image/image_35.jpeg';
         picture[7] = './image/image_39.jpeg';
         picture[8] = './image/card_rear.jpeg';
+        picture[9] = './image/d.jpg';
+        picture[10] = './image/e.jpg';
+        picture[11] = './image/f.jpg';
     }
 
     /**
@@ -691,11 +744,11 @@
             console.log("エラーが発生しました。");
         };
         // メッセージを受信したらmessageに保存
-        wsConnection.onmessage = function(e) {
+        /*wsConnection.onmessage = function(e) {
             message = JSON.parse(e.data);            
             console.log(message);
             console.log(message['card']);
-        }
+        }*/
     }
 
     /**
@@ -711,11 +764,6 @@
 
         // シーンを更新する
         scene.update();
-        /*
-        // 流れる星の状態を更新する
-        backgroundStarArray.map((v) => {
-            v.update();
-        });*/
     
         // 爆発エフェクトの状態を更新する
         explosionArray.map((v) => {

@@ -81,7 +81,7 @@ class Sound {
             // ノードをガベージコレクタが解放するように null でリセットしておく
             this.node = null;
             // ループ
-            this.play();
+            this.playloop();
         }, false);
         // ノードの再生を開始する
         this.node.start();
