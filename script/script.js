@@ -13,12 +13,12 @@
      * canvas の幅
      * @type {number}
      */
-    const CANVAS_WIDTH = 1280;
+    const CANVAS_WIDTH = 1000;
     /**
      * canvas の高さ
      * @type {number}
      */
-    const CANVAS_HEIGHT = 700;
+    const CANVAS_HEIGHT = 800;
      /**
      * ゲームで利用するカード枚数
      * @type {number}
@@ -48,7 +48,7 @@
      * ゲームで利用するカードの行間のスペース
      * @type {number}
      */
-    const COLUMN_SPACE = 20;
+    const COLUMN_SPACE = 30;
      /**
      * ゲームで利用するカードの列間のスペース
      * @type {number}
@@ -63,7 +63,7 @@
      * Cognito Identity Pool ID
      * @type {number}
      */
-    const IDENTITYPOOLID = '';
+    const IDENTITYPOOLID = 'ap-northeast-1:8fb75855-967f-4b01-aea4-4eb49a1f15fc';
      /**
       * 背景を流れる星の個数
       * @type {number}
@@ -170,8 +170,8 @@
      * スコアの位置
      * @type {Array<Explosion>}
      */
-    let scoreX = 800;
-    let scoreY = 90;
+    let scoreX = 300;
+    let scoreY = 780;
     /**
      * Cognitoインスタンス用
      * @type {Array<Explosion>}
@@ -208,7 +208,7 @@
         // ユーティリティクラスから 2d コンテキストを取得
         ctx = util.context;
         // WebSocketのコネクションを確立
-        initializeWSconnection('');
+        initializeWSconnection('ws://43.207.52.1:9002?playerSessionId=test');
         // canvas の大きさを設定
         canvas.width = CANVAS_WIDTH;
         canvas.height = CANVAS_HEIGHT;
@@ -254,7 +254,7 @@
         let cardNum = 0;
         for(i = 0; i < COLUMN_COUNT; ++i){
             for(j = 0; j < ROW_COUNT; ++j){
-                cardArray[cardNum] = new Card(ctx, j*(ROW_SPACE+CARD_WIDTH)+(ROW_SPACE/2+CARD_WIDTH/2), i*(COLUMN_SPACE+CARD_HEIGHT)+(COLUMN_SPACE/2+CARD_HEIGHT/2), CARD_WIDTH, CARD_HEIGHT, picture[CARD_COUNT/2]);
+                cardArray[cardNum] = new Card(ctx, j*(ROW_SPACE+CARD_WIDTH)+(ROW_SPACE/2+CARD_WIDTH/2)+140, i*(COLUMN_SPACE+CARD_HEIGHT)+(COLUMN_SPACE/2+CARD_HEIGHT/2)+20, CARD_WIDTH, CARD_HEIGHT, picture[CARD_COUNT/2]);
                 if(cardNum === CARD_COUNT){
                     break;
                 }else{
@@ -274,13 +274,17 @@
         for(i = 0; i < BACKGROUND_STAR_MAX_COUNT; ++i){
             // 星の速度と大きさはランダムと最大値によって決まるようにする
             let size  = 1 + Math.random() * (BACKGROUND_STAR_MAX_SIZE - 1);
-            let speed = 1 + Math.random() * (BACKGROUND_STAR_MAX_SPEED - 1);
+            let speedX = getRandomInt(-5,5);
+            let speedY = getRandomInt(-5,5);
+            if(speedX === 0 && speedY === 0){
+                speedX = 2;
+            }
             // 星のインスタンスを生成する
-            backgroundStarArray[i] = new BackgroundStar(ctx, size, speed);
+            backgroundStarArray[i] = new BackgroundStar(ctx, size, speedX, speedY);
             // 星の初期位置もランダムに決まるようにする
-            let x = Math.random() * CANVAS_WIDTH;
-            let y = Math.random() * CANVAS_HEIGHT;
-            backgroundStarArray[i].set(x, y);
+            //let x = Math.random() * CANVAS_WIDTH;
+            //let y = Math.random() * CANVAS_HEIGHT;
+            backgroundStarArray[i].set(CANVAS_WIDTH/2, CANVAS_HEIGHT/2-10);
         }
 
         // Amazon Cognito 認証情報プロバイダーを初期化します
@@ -432,6 +436,11 @@
         // マッチングシーン
         scene.add('matching', (time) => {
             util.drawText('Matching Page', 150, 150, 'black', CANVAS_WIDTH/2);
+            // 背景エフェクトの状態を更新する
+            backgroundStarArray.map((v) => {
+                v.update();
+            });  
+            
             // 2 秒経過したらシーンを card に変更する
             if(time > 2.0){
                 activeScene = 'choose';
@@ -725,4 +734,9 @@
         let random = Math.random();
         return Math.floor(random * range);
     }
+    function getRandomInt(min, max) {
+        //min = Math.ceil(min);
+        //max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
+      }
 })();

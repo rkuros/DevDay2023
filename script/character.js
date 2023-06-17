@@ -420,7 +420,7 @@ class BackgroundStar {
      * @param {number} speed - 星の移動速度
      * @param {string} [color='#ffffff'] - 星の色
      */
-    constructor(ctx, size, speed, color = '#ffffff'){
+    constructor(ctx, size, speedX, speedY, color = '#ffffff'){
         /**
          * @type {CanvasRenderingContext2D}
          */
@@ -430,11 +430,13 @@ class BackgroundStar {
          * @type {number}
          */
         this.size = size;
+        this.originalSize = size;
         /**
          * 星の移動速度
          * @type {number}
          */
-        this.speed = speed;
+        this.speedY = speedY;
+        this.speedX = speedX
         /**
          * 星を fill する際の色
          * @type {string}
@@ -464,7 +466,10 @@ class BackgroundStar {
         // 星の色を設定する
         this.ctx.fillStyle = this.color;
         // 星の現在位置を速度に応じて動かす
-        this.position.y += this.speed;
+        this.position.y += this.speedY;
+        this.position.x += this.speedX;
+        // 星のサイズを変更
+        this.size = this.size * 1.007;
         // 星の矩形を描画する
         this.ctx.fillRect(
             this.position.x - this.size / 2,
@@ -473,8 +478,19 @@ class BackgroundStar {
             this.size
         );
         // もし画面下端よりも外に出てしまっていたら上端側に戻す
-        if(this.position.y + this.size > this.ctx.canvas.height){
-            this.position.y = -this.size;
+        if(this.position.y + this.size > this.ctx.canvas.height || this.position.y + this.size < 0){
+            //this.position.y = -this.size;
+            this.position.y = this.ctx.canvas.height/2-10;
+            this.position.x = this.ctx.canvas.width/2;
+            this.size = this.originalSize;
+            this.color = "#" + String(generateRandomInt(999999));
+        }
+        if(this.position.x + this.size > this.ctx.canvas.width || this.position.x + this.size < 0){
+            //this.position.y = -this.size;
+            this.position.y = this.ctx.canvas.height/2-10;
+            this.position.x = this.ctx.canvas.width/2;
+            this.size = this.originalSize;
+            this.color = "#" + String(generateRandomInt(999999));
         }
     }
 }
@@ -486,7 +502,14 @@ function simpleEaseIn(t){
 
 // 得点の描画
 function updatePoint(ctx, util, mypoint, enemypoint, x, y, width){
-    ctx.font = 'bold 40px sans-serif';
-    util.drawText('Your Score:  ' + mypoint, x, y, 'black', width);
-    util.drawText('Enemy Score:  ' + enemypoint, x, y+160, 'black', width);
+    ctx.font = 'bold 30px sans-serif';
+    util.drawText('You:  ' + mypoint, x, y, 'white', width);
+    util.drawText('You:  ', x, y, 'red', width);
+    util.drawText('Player2:  ' + enemypoint, x+250, y, 'white', width);
+    util.drawText('Player2:  ', x+250, y, 'red', width);
+}
+
+function generateRandomInt(range){
+    let random = Math.random();
+    return Math.floor(random * range);
 }
