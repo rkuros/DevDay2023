@@ -189,8 +189,8 @@
      * 効果音再生のための Sound クラスのインスタンス
      * @type {Sound}
      */
-    let bgm = null;
-    let flipsound = null;
+    let bgm = [];
+    let soundEffect = [];
     /**
      * 流れる星のインスタンスを格納する配列
      * @type {Array<BackgroundStar>}
@@ -218,24 +218,8 @@
         canvas.width = CANVAS_WIDTH;
         canvas.height = CANVAS_HEIGHT;
 
-        // ユーザーがクリック操作を行った際に初めてオーディオ関連の処理を開始する
-        bgm = new Sound();
-        flipsound = new Sound();
-        // 音声データを読み込み、準備完了してから初期化処理を行う
-        bgm.load('./sound/clearsky.mp3', (error) => {
-            // もしエラーが発生した場合はアラートを表示して終了する
-            if(error != null){
-                alert('ファイルの読み込みエラーです');
-                return;
-            }
-        });
-        flipsound.load('./sound/open.mp3', (error) => {
-            // もしエラーが発生した場合はアラートを表示して終了する
-            if(error != null){
-                alert('ファイルの読み込みエラーです');
-                return;
-            }
-        });
+        // 音声の初期化
+        bgmLoad();
 
         // 期化処理を行う
         initialize();
@@ -259,7 +243,7 @@
         for(i = 0; i < EXPLOSION_MAX_COUNT; ++i){
             explosionArray[i] = new Explosion(ctx, 150.0, 20, 50.0, 1.0);
             // 爆発エフェクト発生時に効果音を再生できるよう設定する
-            explosionArray[i].setSound(flipsound);
+            explosionArray[i].setSound(soundEffect[0]);
         }
 
         // 流れる星を初期化する
@@ -340,9 +324,11 @@
         // イントロシーン
         scene.add('intro', (time) => {
             ctx.font = 'bold 150px sans-serif';
-            util.drawText('GameStart', 150, 150, 'black', CANVAS_WIDTH/2);
+            util.drawText('新景垂迹', 200, 250, 'white', CANVAS_WIDTH);
             ctx.font = 'bold 50px sans-serif';
-            util.drawText('pressEnter', 300, 300, 'red', CANVAS_WIDTH/2);
+            ctx.globalAlpha = Math.abs(Math.sin((Date.now() - time)/1000));
+            util.drawText('press Enter', 350, 650, 'red', CANVAS_WIDTH/2);
+            ctx.globalAlpha = 1.0;
 
             // Enterでシーンを card に変更する
             if(window.isKeyDown.key_Enter === true && keyUp === true){
@@ -353,9 +339,10 @@
         });
         // ログインシーン
         scene.add('login', (time) => {
-            util.drawText('Login', 150, 150, 'black', CANVAS_WIDTH/2);
+            util.drawText('Login ページです', 150, 150, 'white', CANVAS_WIDTH/2);
+            util.drawText('ユーザー認証を行います', 150, 250, 'white', CANVAS_WIDTH/2);
             ctx.font = 'bold 50px sans-serif';
-            util.drawText('pressEnter', 300, 300, 'red', CANVAS_WIDTH/2);
+            util.drawText('press Enter', 350, 650, 'red', CANVAS_WIDTH/2);
 
             // Enterでシーンを card に変更する
             if(window.isKeyDown.key_Enter === true && keyUp === true){
@@ -409,7 +396,7 @@
                 activeScene = 'userpage';
                 scene.use(activeScene);
                 // BGM再生
-                bgm.playloop();
+                bgm[0].playloop();
             }
         });
         // ユーザーページ
@@ -499,6 +486,11 @@
                             break;
                         }
                     }
+                    if(message['status'] === "Success"){
+                        soundEffect[1].play();
+                    }else if(message['status'] === "Failed"){
+                        soundEffect[2].play();
+                    }
 
                     // スコアの更新
                     myScore = message.your_score;
@@ -514,7 +506,8 @@
                     }
                 }
                 // BGM停止
-                bgm.stop();
+                bgm[0].stop();
+                bgm[1].playloop();
             }
         });
         // カード選択ページ
@@ -544,6 +537,7 @@
                 if(openCardNum === CARD_COUNT){
                     activeScene = 'end';
                     scene.use(activeScene);
+                    bgm[1].stop();
                 }
             }else{
                 activeScene = 'wait';
@@ -574,6 +568,7 @@
                 if(openCardNum === CARD_COUNT){
                     activeScene = 'end';
                     scene.use(activeScene);
+                    bgm[1].stop();
                 }
             }else{
                 
@@ -612,7 +607,7 @@
 
             if(message['status'] === "Success"){
                 ctx.font = 'bold 60px sans-serif';
-                util.drawText('SUCCESS', 380, 400, 'yellow', CANVAS_WIDTH/2);
+                util.drawText('SUCCESS', 370, 400, 'yellow', CANVAS_WIDTH/2);
             }else{
                 ctx.font = 'bold 60px sans-serif';
                 util.drawText('FAILED', 400, 400, 'yellow', CANVAS_WIDTH/2);
@@ -650,7 +645,7 @@
                 scene.use(activeScene);
                 keyUp = false;
                 // BGM再生
-                bgm.playloop();
+                bgm[0].playloop();
                 wsConnection.close();
                 matchFlag = 1;
                 openCardNum = 0;
@@ -665,18 +660,68 @@
      * 画像のパスのリストを取得する//場合によってはイメージのインスタンスを別途作る必要あるかも
      */
     function imageGet(){
-        picture[0] = "./image/image_1.jpeg";
+        /*picture[0] = "./image/image_1.jpeg";
         picture[1] = "./image/image_3.jpeg";
         picture[2] = "./image/image_18.jpeg";
         picture[3] = "./image/image_22.jpeg";
         picture[4] = './image/image_25.jpeg';
         picture[5] = './image/image_33.jpeg';
         picture[6] = './image/image_35.jpeg';
-        picture[7] = './image/image_39.jpeg';
-        picture[8] = './image/card_rear.jpeg';
+        picture[7] = './image/image_39.jpeg';*/
+        //picture[8] = './image/card_rear.jpeg';
         picture[9] = './image/d.jpg';
         picture[10] = './image/e.jpg';
         picture[11] = './image/f.jpg';
+    }
+
+    /**
+     * BGMをロードする関数
+     */
+    function bgmLoad(){
+        // オーディオ関連の処理を開始する
+        for(let i=0; i<2; ++i){
+            bgm[i] = new Sound();
+        };
+        // 音声データを読み込み、準備完了してから初期化処理を行う
+        bgm[0].load('./sound/clearsky.mp3', (error) => {
+            // もしエラーが発生した場合はアラートを表示して終了する
+            if(error != null){
+                alert('ファイルの読み込みエラーです');
+                return;
+            }
+        });
+        bgm[1].load('./sound/thinking.mp3', (error) => {
+            // もしエラーが発生した場合はアラートを表示して終了する
+            if(error != null){
+                alert('ファイルの読み込みエラーです');
+                return;
+            }
+        });
+
+        for(let i=0; i<3; ++i){
+            soundEffect[i] = new Sound();
+        };
+        soundEffect[0].load('./sound/open.mp3', (error) => {
+            // もしエラーが発生した場合はアラートを表示して終了する
+            if(error != null){
+                alert('ファイルの読み込みエラーです');
+                return;
+            }
+        });
+        soundEffect[1].load('./sound/success.mp3', (error) => {
+            // もしエラーが発生した場合はアラートを表示して終了する
+            if(error != null){
+                alert('ファイルの読み込みエラーです');
+                return;
+            }
+        });
+        soundEffect[2].load('./sound/failed.mp3', (error) => {
+            // もしエラーが発生した場合はアラートを表示して終了する
+            if(error != null){
+                alert('ファイルの読み込みエラーです');
+                return;
+            }
+        });
     }
 
     /**
@@ -743,12 +788,6 @@
         wsConnection.onerror = function(error) {
             console.log("エラーが発生しました。");
         };
-        // メッセージを受信したらmessageに保存
-        /*wsConnection.onmessage = function(e) {
-            message = JSON.parse(e.data);            
-            console.log(message);
-            console.log(message['card']);
-        }*/
     }
 
     /**
